@@ -22,7 +22,7 @@ TARGET := $(BINDIR)/$(APP0)
 
 
 
-all: info $(TARGET)
+all: info $(TARGET) tester
 
 $(TARGET): $(OBJECTS) 
 	@mkdir -p $(BINDIR)
@@ -33,7 +33,7 @@ $(TARGET): $(OBJECTS)
 # generic: build any object file required
 $(BUILDDIR)/%.o: $(SRCDIR)/%.$(SRCEXT)
 	@mkdir -p $(dir $@)
-	@echo " $(CC) $(CFLAGS) $(INC) -c -o $@ $<"; $(CC) $(CFLAGS) $(INC) -c -o $@ $<
+	$(CC) $(CFLAGS) $(INC) -c -o $@ $<
 
 clean:
 	@echo " Cleaning..."; 
@@ -51,10 +51,13 @@ info:
 
 # Tests
 tester:
-	$(CC) $(CFLAGS) test/tester.cpp $(INC) $(LIB) -o bin/tester
+	@echo " Compiling tester"
+	$(CC) $(CFLAGS) test/tester.c $(INC) $(LIB) -c -o build/tester.o
+	@echo " Linking tester"
+	$(CC) build/tester.o build/background-process.o $(CFLAGS) $(LDFLAGS) -o bin/tester $(LIB)
 
 # Spikes
 #ticket:
-#  $(CXX) $(CXXFLAGS) spikes/ticket.cpp $(INC) $(LIB) -o bin/ticket
+#  $(CXX) $(CXXFLAGS) spikes/ticket.c $(INC) $(LIB) -o bin/ticket
 
 .PHONY: clean
