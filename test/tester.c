@@ -19,8 +19,10 @@ int main(int argc, char** argv)
 	};
 
 	if (argc > 1) {
+		#ifdef _TESTING_
 		printf("Calling backgroundLaunchTest\n");
 		status = backgroundLaunchTest(array);
+		#endif
 	} 
 	else {
 		printf("Calling backgroundLaunch\n");

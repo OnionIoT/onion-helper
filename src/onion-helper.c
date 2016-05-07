@@ -46,6 +46,7 @@ onionHelperBackgroundMethod(	struct ubus_context *ctx, struct ubus_object *obj,
 
 	char 	**arguments;
 
+
 	// parse the json input
 	blobmsg_parse(	ohBackgroundPolicy, __OH_BACKGROUND_MAX, tb,
 					blob_data(msg), blob_len(msg));
@@ -196,5 +197,5 @@ int main(int argc, char** argv)
 	ubus_free(ctx);
 	uloop_done();
 
-	pthread_exit(NULL);
+	return 0;
 }

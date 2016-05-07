@@ -17,4 +17,6 @@
 #endif
 
 
+#define BUFFER_SIZE 		1024
+
 #endif // _ONION_HELPER_UTILS_H_ 
