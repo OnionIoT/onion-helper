@@ -1,0 +1,10 @@
+ubus call onion-helper background '{"command":"ssh", "params":["-y", "-T", "-R", "2225:localhost:22", "cloudterm@zh.onion.io", "-i", "/root/.ssh/cloudterm.key"]}'
+
+ubus call onion-helper background '{"command":"ssh", "params":["-y", "-T", "-N", "-R", "2225:localhost:22", "cloudterm@zh.onion.io", "-i", "/root/.ssh/cloudterm.key"]}'
+
+ssh -y -T -R 2225:localhost:22 cloudterm@zh.onion.io -i /root/.ssh/cloudterm.key
+
+
+ubus call onion-helper background '{"command":"ls", "params":["/root"]}'
+
+ubus call onion-helper background '{"command":"sleep", "params":["10s"]}'

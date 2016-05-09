@@ -106,7 +106,7 @@ onionHelperBackgroundMethod(	struct ubus_context *ctx, struct ubus_object *obj,
 
 
 	// clean-up
-	//LAZAR!
+	blob_buf_free(&b);
 
 	return UBUS_STATUS_OK;
 }
