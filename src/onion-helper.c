@@ -3,6 +3,10 @@
 #include <libubox/uloop.h>
 #include <libubus.h>
 
+#include <fcntl.h>
+#include <errno.h>
+#include <unistd.h>
+
 
 static struct blob_buf b;
 
@@ -28,6 +32,46 @@ static const struct blobmsg_policy ohEchoPolicy[__OH_ECHO_MAX] = {
 	[OH_ECHO_WORD]		= { .name = "message", .type = BLOBMSG_TYPE_STRING },
 };
 
+enum {
+	OH_WRITE_PATH,
+	OH_WRITE_DATA,
+	OH_WRITE_APPEND,
+	OH_WRITE_MODE,
+	OH_WRITE_BASE64,
+	__OH_WRITE_MAX,
+};
+
+static const struct blobmsg_policy ohWritePolicy[__OH_WRITE_MAX] = {
+	[OH_WRITE_PATH]   = { .name = "path",   .type = BLOBMSG_TYPE_STRING },
+	[OH_WRITE_DATA]   = { .name = "data",   .type = BLOBMSG_TYPE_STRING },
+	[OH_WRITE_APPEND] = { .name = "append", .type = BLOBMSG_TYPE_BOOL   },
+	[OH_WRITE_MODE]   = { .name = "mode",   .type = BLOBMSG_TYPE_INT32  },
+	[OH_WRITE_BASE64] = { .name = "base64", .type = BLOBMSG_TYPE_BOOL   },
+};
+
+
+
+static int
+ubus_errno_status(void)
+{
+	switch (errno)
+	{
+	case EACCES:
+		return UBUS_STATUS_PERMISSION_DENIED;
+
+	case ENOTDIR:
+		return UBUS_STATUS_INVALID_ARGUMENT;
+
+	case ENOENT:
+		return UBUS_STATUS_NOT_FOUND;
+
+	case EINVAL:
+		return UBUS_STATUS_INVALID_ARGUMENT;
+
+	default:
+		return UBUS_STATUS_UNKNOWN_ERROR;
+	}
+}
 
 //// functions that implement methods for the onion-helper ubus group
 // background function
@@ -152,6 +196,91 @@ onionHelperEchoMethod		(	struct ubus_context *ctx, struct ubus_object *obj,
 	return UBUS_STATUS_OK;
 }
 
+// write function
+static int
+onionHelperWriteMethod		(	struct ubus_context *ctx, struct ubus_object *obj,
+								struct ubus_request_data *req, const char *method,
+								struct blob_attr *msg)
+{	
+	struct 	blob_attr *tb[__OH_WRITE_MAX];
+	int 		append = O_TRUNC;
+	int 		fd, rv = 0;
+	int 		status = EXIT_SUCCESS;
+
+	mode_t 		prev_mode, mode = 0666;
+	
+	void 		*data = NULL;
+	ssize_t 	data_len = 0;
+
+
+	// parse the json input
+	blobmsg_parse(	ohWritePolicy, __OH_WRITE_MAX, tb,
+					blob_data(msg), blob_len(msg));
+
+	// check for the path and data arguments
+	if (!tb[OH_WRITE_PATH] || !tb[OH_WRITE_DATA])
+		return UBUS_STATUS_INVALID_ARGUMENT;
+
+	data = blobmsg_data(tb[OH_WRITE_DATA]);
+	data_len = blobmsg_data_len(tb[OH_WRITE_DATA]) - 1;
+
+	// read the append and mode arguments
+	if (tb[OH_WRITE_APPEND] && blobmsg_get_bool(tb[OH_WRITE_APPEND]))
+		append = O_APPEND;
+
+	if (tb[OH_WRITE_MODE])
+		mode = blobmsg_get_u32(tb[OH_WRITE_MODE]);
+
+	// open the file
+	prev_mode = umask(0);
+	fd = open(blobmsg_data(tb[OH_WRITE_PATH]), O_CREAT | O_WRONLY | append, mode);
+	umask(prev_mode);
+
+	if (fd < 0) {
+		rv 		= ubus_errno_status();
+		status 	= EXIT_FAILURE;
+	}
+
+	// perform the base64 actions
+	if (tb[OH_WRITE_BASE64] && blobmsg_get_bool(tb[OH_WRITE_BASE64]))
+	{
+		data_len = b64_decode(data, data, data_len);
+		if (data_len < 0)
+		{
+			rv = UBUS_STATUS_UNKNOWN_ERROR;
+		}
+	}
+
+	if (status == EXIT_SUCCESS) {
+		if (write(fd, data, data_len) < 0) {
+			rv = -1;
+		}
+	}
+
+	if (fsync(fd) < 0) {
+		rv 	= -1;
+	}
+
+	close(fd);
+	sync();
+
+	if (rv) {
+		status = ubus_errno_status();
+	}
+
+	// send back the response
+	blob_buf_init(&b, 0);
+
+	blobmsg_add_u32		(&b, "code",  status);
+	blobmsg_add_u32		(&b, "bytes", (int)data_len);
+	ubus_send_reply	(ctx, req, b.head);
+	// clean-up
+	blob_buf_free(&b);
+
+	
+	return status;
+}
+
 
 //// initialize onion-helper with the ubus
 // onion-helper 
@@ -159,6 +288,7 @@ int onion_helper_init(struct ubus_context *ctx) {
 	static const struct ubus_method onionHelperMethods[] = {
 		UBUS_METHOD ("background", 	onionHelperBackgroundMethod, 	ohBackgroundPolicy),
 		UBUS_METHOD	("echo", 		onionHelperEchoMethod, 			ohEchoPolicy),
+		UBUS_METHOD	("write", 		onionHelperWriteMethod, 		ohWritePolicy),
 	};
 
 	static struct ubus_object_type onionHelperObject_type =
