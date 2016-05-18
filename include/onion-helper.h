@@ -8,6 +8,9 @@
 #include <stdarg.h>
 
 #include <onion-helper-utils.h>
+
 #include <background-process.h>
+#include <curl-intf.h>
 
 #endif // _ONION_HELPER_H_ 
+

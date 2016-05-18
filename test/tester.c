@@ -1,4 +1,5 @@
 #include <background-process.h>
+#include <curl-intf.h>
 
 int main(int argc, char** argv)
 {
@@ -18,22 +19,37 @@ int main(int argc, char** argv)
 		NULL
 	};
 
+	curlInit();
+
 	if (argc > 1) {
-		#ifdef _TESTING_
-		printf("Calling backgroundLaunchTest\n");
-		status = backgroundLaunchTest(array);
-		#endif
-	} 
-	else {
-		printf("Calling backgroundLaunch\n");
-		status = backgroundLaunch(array);	
-		//status = backgroundLaunchVerbose(array, errMsg);	
+
+		if (strcmp(argv[1], "background") == 0) {
+			if (argc > 2) {
+				#ifdef _TESTING_
+				printf("Calling backgroundLaunchTest\n");
+				status = backgroundLaunchTest(array);
+				#endif
+			} 
+			else {
+				printf("Calling backgroundLaunch\n");
+				status = backgroundLaunch(array);	
+				//status = backgroundLaunchVerbose(array, errMsg);	
+			}
+
+
+			printf("backgroundLaunch complete, return %d\n", status);
+			//sleep(10);
+		}
+		else if (strcmp(argv[1], "download") == 0) {
+			printf("running download function: from url '%s' to '%s'\n", argv[2], argv[3]);
+
+			status = downloadFile(argv[2], argv[3]);
+
+			printf("downloadFile status = %d\n", status);
+		}
 	}
 
-
-	printf("backgroundLaunch complete, return %d\n", status);
-	//sleep(10);
-
+	curlCleanup();
 	printf("main thread exiting\n");
 
 	return 0;

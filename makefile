@@ -54,7 +54,7 @@ tester:
 	@echo " Compiling tester"
 	$(CC) $(CFLAGS) test/tester.c $(INC) $(LIB) -c -o build/tester.o
 	@echo " Linking tester"
-	$(CC) build/tester.o build/background-process.o $(CFLAGS) $(LDFLAGS) -o bin/tester $(LIB)
+	$(CC) build/tester.o build/background-process.o build/curl-intf.o $(CFLAGS) $(LDFLAGS) -o bin/tester $(LIB)
 
 # Spikes
 #ticket:

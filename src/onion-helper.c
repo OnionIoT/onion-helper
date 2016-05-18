@@ -49,6 +49,17 @@ static const struct blobmsg_policy ohWritePolicy[__OH_WRITE_MAX] = {
 	[OH_WRITE_BASE64] = { .name = "base64", .type = BLOBMSG_TYPE_BOOL   },
 };
 
+enum {
+	OH_DOWNLOAD_URL,
+	OH_DOWNLOAD_PATH,
+	__OH_DOWNLOAD_MAX,
+};
+
+static const struct blobmsg_policy ohDownloadPolicy[__OH_DOWNLOAD_MAX] = {
+	[OH_DOWNLOAD_URL]		= { .name = "url",  .type = BLOBMSG_TYPE_STRING  },
+	[OH_DOWNLOAD_PATH]		= { .name = "path", .type = BLOBMSG_TYPE_STRING },
+};
+
 
 
 static int
@@ -281,6 +292,42 @@ onionHelperWriteMethod		(	struct ubus_context *ctx, struct ubus_object *obj,
 	return status;
 }
 
+// download function
+// echo function
+static int
+onionHelperDownloadMethod		(	struct ubus_context *ctx, struct ubus_object *obj,
+								struct ubus_request_data *req, const char *method,
+								struct blob_attr *msg)
+{	
+	struct 	blob_attr *tb[__OH_ECHO_MAX];
+	struct 	blob_attr *cur;
+	
+	int 	status;
+
+	// parse the json input
+	blobmsg_parse(	ohDownloadPolicy, __OH_DOWNLOAD_MAX, tb,
+					blob_data(msg), blob_len(msg));
+
+	if (!tb[OH_DOWNLOAD_PATH] || !tb[OH_DOWNLOAD_URL])
+		return UBUS_STATUS_INVALID_ARGUMENT;
+
+	// perform the download
+	status = downloadFile(blobmsg_data(tb[OH_DOWNLOAD_URL]), blobmsg_data(tb[OH_DOWNLOAD_PATH]) );
+
+
+	// response 
+	blob_buf_init(&b, 0);
+
+	blobmsg_add_u32(&b, "status", status);
+	ubus_send_reply(ctx, req, b.head);
+
+
+	// clean-up
+	blob_buf_free(&b);
+
+	return UBUS_STATUS_OK;
+}
+
 
 //// initialize onion-helper with the ubus
 // onion-helper 
@@ -289,6 +336,7 @@ int onion_helper_init(struct ubus_context *ctx) {
 		UBUS_METHOD ("background", 	onionHelperBackgroundMethod, 	ohBackgroundPolicy),
 		UBUS_METHOD	("echo", 		onionHelperEchoMethod, 			ohEchoPolicy),
 		UBUS_METHOD	("write", 		onionHelperWriteMethod, 		ohWritePolicy),
+		UBUS_METHOD	("download", 	onionHelperDownloadMethod, 		ohDownloadPolicy),
 	};
 
 	static struct ubus_object_type onionHelperObject_type =
@@ -311,6 +359,7 @@ int main(int argc, char** argv)
 	static struct ubus_context 	*ctx;
 	const char 					*ubus_socket = NULL;
 
+	curlInit();
 	uloop_init();
 
 	ctx = ubus_connect(ubus_socket);
@@ -326,6 +375,8 @@ int main(int argc, char** argv)
 	uloop_run();
 	ubus_free(ctx);
 	uloop_done();
+
+	curlCleanup();
 
 	return 0;
 }
