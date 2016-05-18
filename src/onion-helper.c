@@ -4,7 +4,6 @@
 #include <libubus.h>
 
 #include <fcntl.h>
-#include <errno.h>
 #include <unistd.h>
 
 
@@ -52,12 +51,14 @@ static const struct blobmsg_policy ohWritePolicy[__OH_WRITE_MAX] = {
 enum {
 	OH_DOWNLOAD_URL,
 	OH_DOWNLOAD_PATH,
+	OH_DOWNLOAD_BACKGROUND,
 	__OH_DOWNLOAD_MAX,
 };
 
 static const struct blobmsg_policy ohDownloadPolicy[__OH_DOWNLOAD_MAX] = {
-	[OH_DOWNLOAD_URL]		= { .name = "url",  .type = BLOBMSG_TYPE_STRING  },
-	[OH_DOWNLOAD_PATH]		= { .name = "path", .type = BLOBMSG_TYPE_STRING },
+	[OH_DOWNLOAD_URL]			= { .name = "url",  .type = BLOBMSG_TYPE_STRING  },
+	[OH_DOWNLOAD_PATH]			= { .name = "path", .type = BLOBMSG_TYPE_STRING },
+	[OH_DOWNLOAD_BACKGROUND]	= { .name = "background", .type = BLOBMSG_TYPE_BOOL   },
 };
 
 
@@ -292,38 +293,64 @@ onionHelperWriteMethod		(	struct ubus_context *ctx, struct ubus_object *obj,
 	return status;
 }
 
+void _downloadSendResponse(struct ubus_context *ctx, struct ubus_request_data *req, int status, bool background, int errorNum)
+{
+	// response 
+	blob_buf_init(&b, 0);
+
+	blobmsg_add_u32(&b, "status", status);
+	blobmsg_add_u8(&b, "background", (background == true) ? 0x01 : 0x00);
+	if (status != EXIT_SUCCESS) {
+		blobmsg_add_string(&b, "error", strerror(errorNum) );
+	}
+	
+	ubus_send_reply(ctx, req, b.head);
+
+	// clean-up
+	blob_buf_free(&b);
+}
+
 // download function
-// echo function
 static int
-onionHelperDownloadMethod		(	struct ubus_context *ctx, struct ubus_object *obj,
+onionHelperDownloadMethod	(	struct ubus_context *ctx, struct ubus_object *obj,
 								struct ubus_request_data *req, const char *method,
 								struct blob_attr *msg)
 {	
-	struct 	blob_attr *tb[__OH_ECHO_MAX];
+	struct 	blob_attr *tb[__OH_DOWNLOAD_MAX];
 	struct 	blob_attr *cur;
-	
-	int 	status;
+	pid_t	pid;
+	int 	status, errorNum;
 
 	// parse the json input
 	blobmsg_parse(	ohDownloadPolicy, __OH_DOWNLOAD_MAX, tb,
 					blob_data(msg), blob_len(msg));
 
-	if (!tb[OH_DOWNLOAD_PATH] || !tb[OH_DOWNLOAD_URL])
+	if (!tb[OH_DOWNLOAD_PATH] || !tb[OH_DOWNLOAD_URL]) {
 		return UBUS_STATUS_INVALID_ARGUMENT;
+	}
 
-	// perform the download
-	status = downloadFile(blobmsg_data(tb[OH_DOWNLOAD_URL]), blobmsg_data(tb[OH_DOWNLOAD_PATH]) );
+	if (tb[OH_DOWNLOAD_BACKGROUND] && blobmsg_get_bool(tb[OH_DOWNLOAD_BACKGROUND]) )
+	{
+		// perform the download in the background
+		pid 	= fork();
 
-
-	// response 
-	blob_buf_init(&b, 0);
-
-	blobmsg_add_u32(&b, "status", status);
-	ubus_send_reply(ctx, req, b.head);
-
-
-	// clean-up
-	blob_buf_free(&b);
+		if (pid == 0) {
+			// child process
+			status = setpgid(0, 0);
+			status = downloadFile(blobmsg_data(tb[OH_DOWNLOAD_URL]), blobmsg_data(tb[OH_DOWNLOAD_PATH]), &errorNum );
+			exit(0);
+		}
+		else {
+			// send ubus response
+			_downloadSendResponse(ctx, req, EXIT_SUCCESS, true, errorNum);
+		}
+	}
+	else {
+		// perform the download
+		status = downloadFile(blobmsg_data(tb[OH_DOWNLOAD_URL]), blobmsg_data(tb[OH_DOWNLOAD_PATH]), &errorNum );
+		// send ubus response
+		_downloadSendResponse(ctx, req, status, false, errorNum);
+	}
 
 	return UBUS_STATUS_OK;
 }

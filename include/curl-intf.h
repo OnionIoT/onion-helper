@@ -7,7 +7,7 @@
 void 		curlInit();
 void 		curlCleanup();
 
-int 		downloadFile		(char* url, char* fileName);
+int 		downloadFile		(char* url, char* fileName, int *errorNum);
 
 
 #endif // _CURL_INTF_H_ 

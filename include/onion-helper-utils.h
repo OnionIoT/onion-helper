@@ -6,9 +6,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <errno.h>
 
 
-//#define _ONION_HELPER_DEBUG
+#define _ONION_HELPER_DEBUG
 
 #ifdef _ONION_HELPER_DEBUG
 	#define OH_DBG_PRINT(a,...)		printf(a,##__VA_ARGS__)

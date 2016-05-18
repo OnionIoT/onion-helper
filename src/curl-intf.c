@@ -1,9 +1,10 @@
 #include <curl-intf.h>
 
 #include "curl/curl.h"
-//#include <unistd.h>
-//#include <fcntl.h>
 
+
+// global variables
+int 	gErrorNum;
 
 // global curl init
 void curlInit() 
@@ -21,19 +22,15 @@ void curlCleanup()
 // callback function to write to a file
 static size_t _writeDataToFile(void *ptr, size_t size, size_t nmemb, void *stream)
 {
+	int errorNum;
 	size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
-	return written;
-	
-	// if (write((int)stream, ptr, size) >= 0) {
-	// 	return size;
-	// }
-	// else {
-	// 	return 0;
-	// }
+
+	gErrorNum = errno;
+	return written;	
 }
 
 // function to download a file
-int downloadFile(char* url, char* fileName)
+int downloadFile(char* url, char* fileName, int *errorNum)
 {
 	int 	status 	= -1;
 
@@ -47,7 +44,7 @@ int downloadFile(char* url, char* fileName)
 	handle = curl_easy_init();
  
 	// set URL to get here
-	_ONION_HELPER_DEBUG("downloading '%s' to '%s'\n", url, fileName);
+	OH_DBG_PRINT("downloading '%s' to '%s'\n", url, fileName);
 	curl_easy_setopt(handle, CURLOPT_URL, url);
  
 #ifdef _ONION_HELPER_DEBUG
@@ -68,20 +65,14 @@ int downloadFile(char* url, char* fileName)
 		status = (int)res;
 
 		// close the header file 
-		fclose(fileHandle);
+		status |= fclose(fileHandle);
 	}
 
-	// fd = open(fileName, O_CREAT | O_WRONLY | O_TRUNC, 0666);
-	// if(fd >= 0) {
-	// 	curl_easy_setopt(handle, CURLOPT_WRITEDATA, fileHandle);	// write the data to this file handle
- 
-	// 	// perform the download
-	// 	res = curl_easy_perform(handle);
-	// 	status = (int)res;
- 
-	// 	// close the header file 
-	// 	close(fd);
-	// }
+	// check for errors from the file write
+	if (status == EXIT_SUCCESS && gErrorNum != EINPROGRESS) {
+		status 		= EXIT_FAILURE;
+		*errorNum 	= gErrorNum;
+	}
  
 	// clean-up 
 	curl_easy_cleanup(handle);

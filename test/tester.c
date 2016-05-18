@@ -4,6 +4,7 @@
 int main(int argc, char** argv)
 {
 	int status = 0;
+	int errorNum;
 	char 	errMsg[256];
 	char * array[] = {
 	    "ssh",
@@ -43,7 +44,7 @@ int main(int argc, char** argv)
 		else if (strcmp(argv[1], "download") == 0) {
 			printf("running download function: from url '%s' to '%s'\n", argv[2], argv[3]);
 
-			status = downloadFile(argv[2], argv[3]);
+			status = downloadFile(argv[2], argv[3], &errorNum);
 
 			printf("downloadFile status = %d\n", status);
 		}
