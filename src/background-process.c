@@ -29,7 +29,10 @@ void backgroundProcess (char **commandArray)
 	// }
 
 	// execute the command
-	return execvp(commandArray[0], commandArray);
+	execvp(commandArray[0], commandArray);
+
+	// free the memory used by the command array
+	free(commandArray);
 }
 
 
